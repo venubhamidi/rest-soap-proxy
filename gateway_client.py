@@ -115,11 +115,14 @@ class GatewayClient:
         path = f"/soap/{service_name}/{operation.name}"
         url = f"{proxy_base_url.rstrip('/')}{path}"
 
+        # Generate helpful description based on operation parameters
+        description = self._generate_tool_description(service_name, operation)
+
         tool_data = {
             "tool": {
                 "name": f"{service_name}_{operation.name}",
                 "url": url,
-                "description": f"SOAP operation: {operation.name}",
+                "description": description,
                 "integration_type": "REST",
                 "request_type": "POST",
                 "input_schema": operation.input_schema or {"type": "object"}
@@ -149,6 +152,51 @@ class GatewayClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error registering tool: {e}")
             raise
+
+    def _generate_tool_description(self, service_name: str, operation: Operation) -> str:
+        """
+        Generate helpful tool description based on operation parameters
+
+        Args:
+            service_name: Name of the service
+            operation: Operation metadata
+
+        Returns:
+            Descriptive string for the tool
+        """
+        input_schema = operation.input_schema or {}
+        properties = input_schema.get('properties', {})
+
+        # Base description
+        base_desc = f"{service_name} - {operation.name}"
+
+        # No parameters
+        if not properties:
+            return f"{base_desc}. No parameters required."
+
+        # Single parameter - make it clear and simple
+        if len(properties) == 1:
+            param_name = list(properties.keys())[0]
+            param_schema = properties[param_name]
+            param_type = param_schema.get('type', 'value')
+
+            # Add helpful hint for simple parameter
+            return (
+                f"{base_desc}. "
+                f"Parameter: {param_name} ({param_type}). "
+                f"You can pass just the value directly, or use {{\"{param_name}\": value}}."
+            )
+
+        # Multiple parameters
+        param_list = []
+        for name, schema in properties.items():
+            param_type = schema.get('type', 'value')
+            required = name in input_schema.get('required', [])
+            req_marker = " (required)" if required else " (optional)"
+            param_list.append(f"{name}: {param_type}{req_marker}")
+
+        params_str = ", ".join(param_list)
+        return f"{base_desc}. Parameters: {params_str}"
 
     def _create_virtual_server(
         self,

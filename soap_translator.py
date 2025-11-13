@@ -31,7 +31,7 @@ class SOAPTranslator:
         self,
         service_name: str,
         operation_name: str,
-        parameters: Dict[str, Any]
+        parameters: Any
     ) -> Dict[str, Any]:
         """
         Execute SOAP operation via REST/JSON interface
@@ -39,7 +39,7 @@ class SOAPTranslator:
         Args:
             service_name: Name of the service
             operation_name: Name of the operation
-            parameters: JSON parameters for the operation
+            parameters: JSON parameters for the operation (dict or simple value)
 
         Returns:
             JSON response from SOAP service
@@ -49,13 +49,23 @@ class SOAPTranslator:
             SOAPFault: If SOAP call fails
         """
         logger.info(f"Executing {service_name}.{operation_name}")
-        logger.debug(f"Parameters: {parameters}")
+        logger.debug(f"Raw parameters: {parameters} (type: {type(parameters).__name__})")
 
         # Get service from database
         service = self._get_service(service_name)
 
         if not service:
             raise ValueError(f"Service '{service_name}' not found. Please register the WSDL first.")
+
+        # Get operation metadata from database
+        operation_metadata = self._get_operation(service, operation_name)
+
+        if not operation_metadata:
+            raise ValueError(f"Operation '{operation_name}' not found in service '{service_name}'")
+
+        # Smart parameter handling: auto-wrap simple values for single-parameter operations
+        parameters = self._normalize_parameters(parameters, operation_metadata)
+        logger.debug(f"Normalized parameters: {parameters}")
 
         # Get WSDL URL
         wsdl_url = service.wsdl_url
@@ -99,6 +109,60 @@ class SOAPTranslator:
             return service
         finally:
             db.close()
+
+    def _get_operation(self, service: Service, operation_name: str):
+        """Get operation metadata from database"""
+        from database import Operation
+        db = SessionLocal()
+        try:
+            operation = db.query(Operation).filter(
+                Operation.service_id == service.id,
+                Operation.name == operation_name
+            ).first()
+            return operation
+        finally:
+            db.close()
+
+    def _normalize_parameters(self, parameters: Any, operation_metadata) -> Dict[str, Any]:
+        """
+        Normalize parameters for SOAP call.
+
+        Smart handling:
+        - If parameters is already a dict, return as-is
+        - If parameters is a simple value (str, int, float, bool) and operation
+          has only one parameter, auto-wrap it into an object
+
+        Args:
+            parameters: Raw parameters from request
+            operation_metadata: Operation metadata from database
+
+        Returns:
+            Dictionary of parameters ready for SOAP call
+        """
+        # Already a dict - use as-is
+        if isinstance(parameters, dict):
+            return parameters
+
+        # Get input schema
+        input_schema = operation_metadata.input_schema
+        properties = input_schema.get('properties', {})
+
+        # Check if single parameter operation
+        if len(properties) == 1:
+            param_name = list(properties.keys())[0]
+            logger.info(f"Auto-wrapping simple value into parameter '{param_name}'")
+            return {param_name: parameters}
+
+        # Multiple parameters but simple value provided - this is an error
+        if len(properties) > 1:
+            param_names = list(properties.keys())
+            raise ValueError(
+                f"Operation requires multiple parameters {param_names}, "
+                f"but received a simple value. Please provide an object with all required parameters."
+            )
+
+        # No parameters expected
+        return {}
 
     def _get_zeep_client(self, wsdl_url: str, service_name: str) -> Client:
         """
