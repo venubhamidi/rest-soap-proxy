@@ -1,5 +1,5 @@
 """
-Forge Studio - SOAP-to-REST Proxy Service
+SOAP-Proxy - SOAP-to-REST Proxy Service
 Main Flask application
 """
 from flask import Flask, request, jsonify, render_template, send_file, session

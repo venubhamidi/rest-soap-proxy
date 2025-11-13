@@ -1,4 +1,4 @@
-# Forge Studio
+# SOAP-Proxy
 
 **SOAP-to-REST Proxy with Authentication**
 
