@@ -55,16 +55,18 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         const data = await response.json();
 
         if (response.ok) {
-            let message = `<h3>✅ Success!</h3>`;
+            let message = `<h3>✅ WSDL Converted Successfully!</h3>`;
             message += `<p><strong>Service:</strong> ${data.service_name}</p>`;
-            message += `<p><strong>Operations:</strong> ${data.operations_count}</p>`;
+            message += `<p><strong>Operations:</strong> ${data.operations_count} SOAP operations converted to REST endpoints</p>`;
 
             if (data.gateway_registered) {
-                message += `<p><strong>Gateway:</strong> ✅ Registered</p>`;
+                message += `<p><strong>Gateway Registration:</strong> ✅ Also registered with MCP Gateway</p>`;
                 message += `<p><strong>MCP Endpoint:</strong></p>`;
                 message += `<code>${data.mcp_endpoint}</code>`;
             } else if (data.gateway_error) {
-                message += `<p><strong>Gateway:</strong> ⚠️ Registration failed - ${data.gateway_error}</p>`;
+                message += `<p><strong>Gateway Registration:</strong> ⚠️ Failed - ${data.gateway_error}</p>`;
+            } else {
+                message += `<p><strong>Note:</strong> Service converted but not registered with Gateway (checkbox was unchecked)</p>`;
             }
 
             showResult(resultBox, 'success', message);
@@ -115,7 +117,7 @@ async function loadServices() {
         const data = await response.json();
 
         if (data.services.length === 0) {
-            servicesList.innerHTML = '<p class="loading">No services registered yet. Upload a WSDL to get started!</p>';
+            servicesList.innerHTML = '<p class="loading">No services converted yet. Upload a WSDL file to get started!</p>';
             return;
         }
 

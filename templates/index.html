@@ -87,9 +87,9 @@
                     <label class="checkbox-label">
                         <input type="checkbox" id="auto-register" name="auto_register_gateway" checked>
                         <span class="checkmark"></span>
-                        <span class="label-text">✅ Automatically register with MCP Gateway</span>
+                        <span class="label-text">✅ Also register with MCP Gateway</span>
                     </label>
-                    <small class="help-text">The service will be immediately available in Claude</small>
+                    <small class="help-text">Check this to automatically register the converted service with Gateway for Claude access</small>
                 </div>
                 {% else %}
                 <div class="info-box warning">
@@ -98,8 +98,8 @@
                 {% endif %}
 
                 <button type="submit" class="btn btn-primary" id="submit-btn">
-                    <span class="btn-text">Convert & Register</span>
-                    <span class="btn-loader" style="display: none;">Processing...</span>
+                    <span class="btn-text">🔄 Convert WSDL</span>
+                    <span class="btn-loader" style="display: none;">Converting...</span>
                 </button>
             </form>
 
@@ -109,7 +109,7 @@
         <!-- Services List Section -->
         <section class="services-section">
             <div class="section-header">
-                <h2>Registered Services</h2>
+                <h2>📋 Services</h2>
                 <button class="btn btn-secondary btn-small" onclick="loadServices()">🔄 Refresh</button>
             </div>
             <div id="services-list" class="services-list">
