@@ -13,6 +13,40 @@
             <p class="subtitle">Convert WSDL services to REST APIs with OpenAPI specifications</p>
         </header>
 
+        <!-- Gateway Configuration Section -->
+        <section class="config-section">
+            <details>
+                <summary>⚙️ Gateway Configuration</summary>
+                <div class="config-content">
+                    <div class="info-box info">
+                        <p><strong>Current Status:</strong> <span id="gateway-status">{{ 'Connected' if gateway_configured else 'Not Configured' }}</span></p>
+                    </div>
+                    <p class="help-text">To enable auto-registration with MCP Gateway, set these environment variables:</p>
+
+                    <div class="form-group">
+                        <label>Gateway URL:</label>
+                        <input type="text" id="gateway-url" placeholder="http://gateway:4444" readonly>
+                        <small>Set via GATEWAY_URL environment variable</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Gateway Token:</label>
+                        <input type="password" id="gateway-token" placeholder="Bearer token..." readonly>
+                        <small>Set via GATEWAY_TOKEN environment variable</small>
+                    </div>
+
+                    <div class="info-box warning">
+                        <p><strong>How to Configure:</strong></p>
+                        <ol style="margin: 10px 0 0 20px; text-align: left;">
+                            <li><strong>Local Development:</strong> Edit <code>.env</code> file and restart the service</li>
+                            <li><strong>Docker:</strong> Use <code>--env-file .env</code> or <code>-e GATEWAY_URL=...</code></li>
+                            <li><strong>Railway:</strong> Set environment variables in Railway dashboard</li>
+                        </ol>
+                    </div>
+                </div>
+            </details>
+        </section>
+
         <!-- Upload Section -->
         <section class="upload-section">
             <h2>Upload WSDL</h2>
@@ -45,7 +79,7 @@
                 </div>
                 {% else %}
                 <div class="info-box warning">
-                    <p>⚠️ Gateway not configured. Set GATEWAY_URL and GATEWAY_TOKEN to enable auto-registration.</p>
+                    <p>⚠️ Gateway not configured. <a href="#" onclick="document.querySelector('.config-section details').open=true; document.querySelector('.config-section').scrollIntoView({behavior:'smooth'}); return false;">Click here to configure</a></p>
                 </div>
                 {% endif %}
 
