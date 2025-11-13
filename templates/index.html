@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOAP-to-REST Proxy</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧼 SOAP-to-REST Proxy</h1>
+            <p class="subtitle">Convert WSDL services to REST APIs with OpenAPI specifications</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <h2>Upload WSDL</h2>
+            <form id="upload-form">
+                <div class="form-group">
+                    <label>WSDL File:</label>
+                    <input type="file" id="wsdl-file" name="wsdl_file" accept=".wsdl,.xml">
+                    <small>Or provide a URL below</small>
+                </div>
+
+                <div class="form-group">
+                    <label>WSDL URL:</label>
+                    <input type="url" id="wsdl-url" name="wsdl_url" placeholder="http://example.com/service?wsdl">
+                </div>
+
+                <div class="form-group">
+                    <label>Service Name (optional):</label>
+                    <input type="text" id="service-name" name="service_name" placeholder="Auto-detected from WSDL">
+                </div>
+
+                <!-- Auto-register checkbox -->
+                {% if gateway_configured %}
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-register" name="auto_register_gateway" checked>
+                        <span class="checkmark"></span>
+                        <span class="label-text">✅ Automatically register with MCP Gateway</span>
+                    </label>
+                    <small class="help-text">The service will be immediately available in Claude</small>
+                </div>
+                {% else %}
+                <div class="info-box warning">
+                    <p>⚠️ Gateway not configured. Set GATEWAY_URL and GATEWAY_TOKEN to enable auto-registration.</p>
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    <span class="btn-text">Convert & Register</span>
+                    <span class="btn-loader" style="display: none;">Processing...</span>
+                </button>
+            </form>
+
+            <div id="upload-result" class="result-box" style="display: none;"></div>
+        </section>
+
+        <!-- Services List Section -->
+        <section class="services-section">
+            <div class="section-header">
+                <h2>Registered Services</h2>
+                <button class="btn btn-secondary btn-small" onclick="loadServices()">🔄 Refresh</button>
+            </div>
+            <div id="services-list" class="services-list">
+                <p class="loading">Loading services...</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
