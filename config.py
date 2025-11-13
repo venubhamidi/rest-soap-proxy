@@ -27,6 +27,9 @@ class Config:
     GATEWAY_URL = os.getenv('GATEWAY_URL', '')
     GATEWAY_TOKEN = os.getenv('GATEWAY_TOKEN', '')
 
+    # Authentication (optional - for securing the proxy)
+    API_KEY = os.getenv('API_KEY', '')  # If set, requires X-API-Key header for all requests
+
     # Zeep Configuration
     ZEEP_CACHE_TIMEOUT = int(os.getenv('ZEEP_CACHE_TIMEOUT', 86400))  # 24 hours
     WSDL_REQUEST_TIMEOUT = int(os.getenv('WSDL_REQUEST_TIMEOUT', 30))  # 30 seconds

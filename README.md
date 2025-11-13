@@ -1,11 +1,19 @@
-# rest-soap-proxy
+# Forge Studio
 
-# SOAP-to-REST Proxy Service
+**SOAP-to-REST Proxy with Authentication**
 
-A standalone service that converts WSDL SOAP services into REST APIs with OpenAPI specifications. Designed to integrate with MCP Gateway for use with Claude Desktop.
+A secure, standalone service that converts WSDL SOAP services into REST APIs with OpenAPI specifications. Designed to integrate with MCP Gateway for use with Claude Desktop.
+
+## 🔐 Default Credentials
+
+- **Username:** `admin`
+- **Password:** `Alekhya@123`
+
+> ⚠️ **Important:** Change these credentials in production by modifying the authentication logic in `app.py`
 
 ## Features
 
+- 🔐 **Secure Authentication** - Username/password login with session management
 - 🔄 **WSDL to OpenAPI Conversion** - Automatic conversion of SOAP services to REST APIs
 - 📥 **Downloadable OpenAPI Specs** - Export specs in YAML or JSON format
 - 🔗 **MCP Gateway Integration** - Optional automatic registration with Claude MCP Gateway
@@ -13,6 +21,7 @@ A standalone service that converts WSDL SOAP services into REST APIs with OpenAP
 - 💾 **PostgreSQL Storage** - Persistent service registry with operation metadata
 - 🌐 **Web UI** - User-friendly interface with checkbox for auto-registration
 - 🐳 **Railway Deployment** - Ready to deploy with Dockerfile
+- 🔑 **API Key Support** - Optional API key authentication for programmatic access
 
 ## Architecture
 

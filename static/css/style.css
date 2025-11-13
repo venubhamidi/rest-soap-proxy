@@ -17,10 +17,22 @@ body {
 }
 
 header {
-    text-align: center;
     color: white;
     margin-bottom: 40px;
     padding: 40px 20px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.header-content > div:first-child {
+    text-align: center;
+    flex: 1;
 }
 
 header h1 {
@@ -32,6 +44,24 @@ header h1 {
 .subtitle {
     font-size: 1.2em;
     opacity: 0.9;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-logout {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    padding: 10px 20px;
+    font-size: 1em;
+}
+
+.btn-logout:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: white;
 }
 
 section {

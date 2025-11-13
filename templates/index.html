@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SOAP-to-REST Proxy</title>
+    <title>Forge Studio - SOAP-to-REST Proxy</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🧼 SOAP-to-REST Proxy</h1>
-            <p class="subtitle">Convert WSDL services to REST APIs with OpenAPI specifications</p>
+            <div class="header-content">
+                <div>
+                    <h1>🔨 Forge Studio</h1>
+                    <p class="subtitle">Convert WSDL services to REST APIs with OpenAPI specifications</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-logout" onclick="logout()">🚪 Logout</button>
+                </div>
+            </div>
         </header>
 
         <!-- Gateway Configuration Section -->

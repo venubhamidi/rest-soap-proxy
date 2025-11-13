@@ -1,8 +1,9 @@
 """
-SOAP-to-REST Proxy Service
+Forge Studio - SOAP-to-REST Proxy Service
 Main Flask application
 """
 from flask import Flask, request, jsonify, render_template, send_file, session
+from functools import wraps
 import json
 import yaml
 import tempfile
@@ -53,7 +54,59 @@ def get_gateway_token():
     return session.get('gateway_token') or Config.GATEWAY_TOKEN
 
 
+def require_auth(f):
+    """Decorator to require authentication for routes"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if API key is configured
+        if Config.API_KEY:
+            api_key = request.headers.get('X-API-Key')
+            if api_key != Config.API_KEY:
+                return jsonify({'error': 'Unauthorized. Invalid or missing API key.'}), 401
+
+        # Check if user is logged in (for web UI)
+        if not session.get('authenticated'):
+            # For API calls, return JSON error
+            if request.path.startswith('/api/') or request.path.startswith('/soap/'):
+                return jsonify({'error': 'Unauthorized. Please authenticate.'}), 401
+            # For web UI, redirect to login
+            return render_template('login.html')
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page and handler"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # Check credentials
+        if username == 'admin' and password == 'Alekhya@123':
+            session['authenticated'] = True
+            session['username'] = username
+            logger.info(f"User {username} logged in successfully")
+            return jsonify({'success': True})
+        else:
+            logger.warning(f"Failed login attempt for user: {username}")
+            return jsonify({'error': 'Invalid username or password'}), 401
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    """Logout handler"""
+    username = session.get('username', 'unknown')
+    session.clear()
+    logger.info(f"User {username} logged out")
+    return render_template('login.html', message='Logged out successfully')
+
+
 @app.route('/')
+@require_auth
 def index():
     """Main web UI"""
     return render_template('index.html', gateway_configured=is_gateway_configured())
@@ -82,6 +135,7 @@ def health():
 
 
 @app.route('/api/convert', methods=['POST'])
+@require_auth
 def convert_wsdl():
     """
     Convert WSDL to OpenAPI and register service
@@ -202,6 +256,7 @@ def convert_wsdl():
         db.close()
 
 
+@require_auth
 @app.route('/api/services', methods=['GET'])
 def list_services():
     """List all registered services"""
@@ -216,6 +271,7 @@ def list_services():
         db.close()
 
 
+@require_auth
 @app.route('/api/services/<service_id>', methods=['GET'])
 def get_service(service_id):
     """Get service details"""
@@ -235,6 +291,7 @@ def get_service(service_id):
         db.close()
 
 
+@require_auth
 @app.route('/api/services/<service_id>', methods=['DELETE'])
 def delete_service(service_id):
     """Delete service and unregister from Gateway if needed"""
@@ -274,6 +331,7 @@ def delete_service(service_id):
         db.close()
 
 
+@require_auth
 @app.route('/api/services/<service_id>/openapi.<format>', methods=['GET'])
 def download_openapi(service_id, format):
     """Download OpenAPI spec in YAML or JSON format"""
@@ -308,6 +366,7 @@ def download_openapi(service_id, format):
         db.close()
 
 
+@require_auth
 @app.route('/api/services/<service_id>/register-gateway', methods=['POST'])
 def register_with_gateway(service_id):
     """Manually register service with MCP Gateway"""
@@ -351,6 +410,7 @@ def register_with_gateway(service_id):
         db.close()
 
 
+@require_auth
 @app.route('/api/services/<service_id>/unregister-gateway', methods=['DELETE'])
 def unregister_from_gateway(service_id):
     """Unregister service from MCP Gateway"""
@@ -387,6 +447,7 @@ def unregister_from_gateway(service_id):
         db.close()
 
 
+@require_auth
 @app.route('/soap/<service_name>/<operation_name>', methods=['POST'])
 def execute_soap_operation(service_name, operation_name):
     """
@@ -423,6 +484,7 @@ def execute_soap_operation(service_name, operation_name):
         }), 500
 
 
+@require_auth
 @app.route('/api/gateway/config', methods=['GET'])
 def get_gateway_config():
     """Get gateway configuration (from env or session)"""
@@ -436,6 +498,7 @@ def get_gateway_config():
     })
 
 
+@require_auth
 @app.route('/api/gateway/config', methods=['POST'])
 def save_gateway_config():
     """Save gateway configuration to session"""
