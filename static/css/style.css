@@ -91,13 +91,58 @@ label {
 
 input[type="file"],
 input[type="url"],
-input[type="text"] {
+input[type="text"],
+input[type="password"] {
     width: 100%;
     padding: 12px 15px;
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     font-size: 1em;
     transition: border-color 0.3s;
+}
+
+input.input-large {
+    min-height: 50px;
+    font-size: 0.95em;
+    padding: 15px;
+}
+
+/* Token input with Bearer prefix */
+.token-input-wrapper {
+    display: flex;
+    align-items: center;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+}
+
+.token-input-wrapper:focus-within {
+    border-color: #667eea;
+}
+
+.token-prefix {
+    background: #f8f9fa;
+    padding: 15px;
+    font-family: monospace;
+    font-weight: bold;
+    color: #667eea;
+    border-right: 2px solid #e0e0e0;
+    white-space: nowrap;
+    font-size: 0.95em;
+}
+
+.input-with-prefix {
+    border: none !important;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9em;
+    padding: 15px;
+}
+
+.input-with-prefix:focus {
+    outline: none;
+    border: none;
 }
 
 input:focus {

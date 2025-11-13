@@ -33,14 +33,17 @@
                     <form id="gateway-config-form">
                         <div class="form-group">
                             <label>Gateway URL:</label>
-                            <input type="text" id="gateway-url" name="gateway_url" placeholder="http://gateway:4444" required>
+                            <input type="text" id="gateway-url" name="gateway_url" placeholder="http://gateway:4444" required class="input-large">
                             <small>Enter the base URL of your MCP Gateway</small>
                         </div>
 
                         <div class="form-group">
-                            <label>Gateway Token:</label>
-                            <input type="password" id="gateway-token" name="gateway_token" placeholder="Bearer token..." required>
-                            <small>Enter your Gateway authentication token</small>
+                            <label>Bearer Token:</label>
+                            <div class="token-input-wrapper">
+                                <span class="token-prefix">Bearer </span>
+                                <input type="text" id="gateway-token" name="gateway_token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required class="input-with-prefix" style="font-family: monospace;">
+                            </div>
+                            <small><strong>💡 Tip:</strong> Enter token only (without "Bearer" prefix) - it will be added automatically</small>
                         </div>
 
                         <button type="submit" class="btn btn-primary" id="save-gateway-btn">
