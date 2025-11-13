@@ -3,6 +3,10 @@
 // Load services on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadServices();
+    loadGatewayConfig();
+
+    // Setup gateway config form handler
+    document.getElementById('gateway-config-form').addEventListener('submit', saveGatewayConfig);
 });
 
 // Handle WSDL upload form
@@ -256,5 +260,95 @@ async function deleteService(serviceId, serviceName) {
 
     } catch (error) {
         alert(`❌ Error: ${error.message}`);
+    }
+}
+
+// Load gateway configuration
+async function loadGatewayConfig() {
+    try {
+        const response = await fetch('/api/gateway/config');
+        const data = await response.json();
+
+        if (data.gateway_url) {
+            document.getElementById('gateway-url').value = data.gateway_url;
+        }
+        if (data.gateway_token) {
+            document.getElementById('gateway-token').value = data.gateway_token;
+        }
+
+        // Update status
+        const statusEl = document.getElementById('gateway-status');
+        if (data.configured) {
+            statusEl.textContent = 'Connected ✅';
+            statusEl.className = 'badge success';
+        } else {
+            statusEl.textContent = 'Not Configured ⚠️';
+            statusEl.className = 'badge warning';
+        }
+    } catch (error) {
+        console.error('Error loading gateway config:', error);
+    }
+}
+
+// Save gateway configuration
+async function saveGatewayConfig(e) {
+    e.preventDefault();
+
+    const saveBtn = document.getElementById('save-gateway-btn');
+    const btnText = saveBtn.querySelector('.btn-text');
+    const btnLoader = saveBtn.querySelector('.btn-loader');
+    const resultBox = document.getElementById('gateway-config-result');
+
+    // Disable button
+    saveBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline';
+
+    const gatewayUrl = document.getElementById('gateway-url').value;
+    const gatewayToken = document.getElementById('gateway-token').value;
+
+    try {
+        const response = await fetch('/api/gateway/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                gateway_url: gatewayUrl,
+                gateway_token: gatewayToken
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            resultBox.className = 'info-box success';
+            resultBox.innerHTML = '<p><strong>✅ Configuration saved successfully!</strong></p><p>You can now enable auto-registration when uploading WSDL files.</p>';
+            resultBox.style.display = 'block';
+
+            // Update status
+            document.getElementById('gateway-status').textContent = 'Connected ✅';
+
+            // Reload page to update gateway checkboxes
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            resultBox.className = 'info-box error';
+            resultBox.innerHTML = `<p><strong>❌ Error:</strong> ${data.error}</p>`;
+            resultBox.style.display = 'block';
+        }
+
+    } catch (error) {
+        resultBox.className = 'info-box error';
+        resultBox.innerHTML = `<p><strong>❌ Error:</strong> ${error.message}</p>`;
+        resultBox.style.display = 'block';
+    } finally {
+        saveBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+
+        // Hide result after 5 seconds
+        setTimeout(() => {
+            resultBox.style.display = 'none';
+        }, 5000);
     }
 }

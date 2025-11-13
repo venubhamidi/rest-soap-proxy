@@ -2,7 +2,7 @@
 SOAP-to-REST Proxy Service
 Main Flask application
 """
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, request, jsonify, render_template, send_file, session
 import json
 import yaml
 import tempfile
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Initialize database
 init_db()
@@ -35,10 +36,27 @@ init_db()
 soap_translator = get_soap_translator()
 
 
+def is_gateway_configured():
+    """Check if gateway is configured (env vars or session)"""
+    return Config.gateway_configured() or (
+        session.get('gateway_url') and session.get('gateway_token')
+    )
+
+
+def get_gateway_url():
+    """Get gateway URL from session or env"""
+    return session.get('gateway_url') or Config.GATEWAY_URL
+
+
+def get_gateway_token():
+    """Get gateway token from session or env"""
+    return session.get('gateway_token') or Config.GATEWAY_TOKEN
+
+
 @app.route('/')
 def index():
     """Main web UI"""
-    return render_template('index.html', gateway_configured=Config.gateway_configured())
+    return render_template('index.html', gateway_configured=is_gateway_configured())
 
 
 @app.route('/health')
@@ -58,7 +76,7 @@ def health():
     return jsonify({
         'status': 'healthy',
         'database': db_status,
-        'gateway_configured': Config.gateway_configured(),
+        'gateway_configured': is_gateway_configured(),
         'cache_stats': soap_translator.get_cache_stats()
     })
 
@@ -141,9 +159,12 @@ def convert_wsdl():
         }
 
         # Auto-register with Gateway if requested
-        if auto_register and Config.gateway_configured():
+        if auto_register and is_gateway_configured():
             try:
-                gateway_client = GatewayClient()
+                gateway_client = GatewayClient(
+                    gateway_url=get_gateway_url(),
+                    bearer_token=get_gateway_token()
+                )
                 gateway_result = gateway_client.register_service(
                     service=service,
                     proxy_base_url=Config.PROXY_BASE_URL,
@@ -225,9 +246,12 @@ def delete_service(service_id):
             return jsonify({'error': 'Service not found'}), 404
 
         # Unregister from Gateway if registered
-        if service.gateway_registered and Config.gateway_configured():
+        if service.gateway_registered and is_gateway_configured():
             try:
-                gateway_client = GatewayClient()
+                gateway_client = GatewayClient(
+                    gateway_url=get_gateway_url(),
+                    bearer_token=get_gateway_token()
+                )
                 gateway_client.unregister_service(service, db)
                 logger.info(f"Service unregistered from Gateway: {service.name}")
             except Exception as e:
@@ -287,8 +311,8 @@ def download_openapi(service_id, format):
 @app.route('/api/services/<service_id>/register-gateway', methods=['POST'])
 def register_with_gateway(service_id):
     """Manually register service with MCP Gateway"""
-    if not Config.gateway_configured():
-        return jsonify({'error': 'Gateway not configured. Set GATEWAY_URL and GATEWAY_TOKEN'}), 400
+    if not is_gateway_configured():
+        return jsonify({'error': 'Gateway not configured. Please configure Gateway URL and Token in the UI'}), 400
 
     db = SessionLocal()
     try:
@@ -301,7 +325,10 @@ def register_with_gateway(service_id):
             return jsonify({'error': 'Service already registered with Gateway'}), 409
 
         # Register with Gateway
-        gateway_client = GatewayClient()
+        gateway_client = GatewayClient(
+            gateway_url=get_gateway_url(),
+            bearer_token=get_gateway_token()
+        )
         result = gateway_client.register_service(
             service=service,
             proxy_base_url=Config.PROXY_BASE_URL,
@@ -327,7 +354,7 @@ def register_with_gateway(service_id):
 @app.route('/api/services/<service_id>/unregister-gateway', methods=['DELETE'])
 def unregister_from_gateway(service_id):
     """Unregister service from MCP Gateway"""
-    if not Config.gateway_configured():
+    if not is_gateway_configured():
         return jsonify({'error': 'Gateway not configured'}), 400
 
     db = SessionLocal()
@@ -341,7 +368,10 @@ def unregister_from_gateway(service_id):
             return jsonify({'error': 'Service not registered with Gateway'}), 409
 
         # Unregister from Gateway
-        gateway_client = GatewayClient()
+        gateway_client = GatewayClient(
+            gateway_url=get_gateway_url(),
+            bearer_token=get_gateway_token()
+        )
         gateway_client.unregister_service(service, db)
 
         logger.info(f"Service unregistered from Gateway: {service.name}")
@@ -391,6 +421,42 @@ def execute_soap_operation(service_name, operation_name):
             'error': str(e),
             'detail': traceback.format_exc() if Config.DEBUG else None
         }), 500
+
+
+@app.route('/api/gateway/config', methods=['GET'])
+def get_gateway_config():
+    """Get gateway configuration (from env or session)"""
+    gateway_url = session.get('gateway_url') or Config.GATEWAY_URL
+    gateway_token = session.get('gateway_token') or Config.GATEWAY_TOKEN
+
+    return jsonify({
+        'gateway_url': gateway_url,
+        'gateway_token': '****' if gateway_token else '',  # Mask token
+        'configured': bool(gateway_url and gateway_token)
+    })
+
+
+@app.route('/api/gateway/config', methods=['POST'])
+def save_gateway_config():
+    """Save gateway configuration to session"""
+    data = request.json
+
+    gateway_url = data.get('gateway_url', '').strip()
+    gateway_token = data.get('gateway_token', '').strip()
+
+    if not gateway_url or not gateway_token:
+        return jsonify({'error': 'Both gateway_url and gateway_token are required'}), 400
+
+    # Store in session
+    session['gateway_url'] = gateway_url
+    session['gateway_token'] = gateway_token
+
+    logger.info(f"Gateway configuration saved to session: {gateway_url}")
+
+    return jsonify({
+        'success': True,
+        'message': 'Gateway configuration saved successfully'
+    })
 
 
 if __name__ == '__main__':

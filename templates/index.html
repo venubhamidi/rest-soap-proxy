@@ -19,29 +19,33 @@
                 <summary>⚙️ Gateway Configuration</summary>
                 <div class="config-content">
                     <div class="info-box info">
-                        <p><strong>Current Status:</strong> <span id="gateway-status">{{ 'Connected' if gateway_configured else 'Not Configured' }}</span></p>
+                        <p><strong>Current Status:</strong> <span id="gateway-status">{{ 'Connected ✅' if gateway_configured else 'Not Configured ⚠️' }}</span></p>
                     </div>
-                    <p class="help-text">To enable auto-registration with MCP Gateway, set these environment variables:</p>
+                    <p class="help-text">Configure MCP Gateway to enable auto-registration of SOAP services:</p>
 
-                    <div class="form-group">
-                        <label>Gateway URL:</label>
-                        <input type="text" id="gateway-url" placeholder="http://gateway:4444" readonly>
-                        <small>Set via GATEWAY_URL environment variable</small>
-                    </div>
+                    <form id="gateway-config-form">
+                        <div class="form-group">
+                            <label>Gateway URL:</label>
+                            <input type="text" id="gateway-url" name="gateway_url" placeholder="http://gateway:4444" required>
+                            <small>Enter the base URL of your MCP Gateway</small>
+                        </div>
 
-                    <div class="form-group">
-                        <label>Gateway Token:</label>
-                        <input type="password" id="gateway-token" placeholder="Bearer token..." readonly>
-                        <small>Set via GATEWAY_TOKEN environment variable</small>
-                    </div>
+                        <div class="form-group">
+                            <label>Gateway Token:</label>
+                            <input type="password" id="gateway-token" name="gateway_token" placeholder="Bearer token..." required>
+                            <small>Enter your Gateway authentication token</small>
+                        </div>
 
-                    <div class="info-box warning">
-                        <p><strong>How to Configure:</strong></p>
-                        <ol style="margin: 10px 0 0 20px; text-align: left;">
-                            <li><strong>Local Development:</strong> Edit <code>.env</code> file and restart the service</li>
-                            <li><strong>Docker:</strong> Use <code>--env-file .env</code> or <code>-e GATEWAY_URL=...</code></li>
-                            <li><strong>Railway:</strong> Set environment variables in Railway dashboard</li>
-                        </ol>
+                        <button type="submit" class="btn btn-primary" id="save-gateway-btn">
+                            <span class="btn-text">💾 Save Configuration</span>
+                            <span class="btn-loader" style="display: none;">Saving...</span>
+                        </button>
+                    </form>
+
+                    <div id="gateway-config-result" style="display: none; margin-top: 15px;"></div>
+
+                    <div class="info-box info" style="margin-top: 20px;">
+                        <p><strong>Note:</strong> Configuration is stored in session and will be cleared on browser restart. For persistent configuration, set <code>GATEWAY_URL</code> and <code>GATEWAY_TOKEN</code> environment variables.</p>
                     </div>
                 </div>
             </details>
