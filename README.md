@@ -72,16 +72,79 @@ http://localhost:8080
 ### Railway Deployment
 
 1. **Create new Railway project**
-2. **Connect PostgreSQL database**
-3. **Set environment variables** in Railway dashboard:
-   ```
-   DATABASE_URL=postgresql://user:password@host:port/database
-   PORT=8080
-   PROXY_BASE_URL=https://your-app.railway.app
-   GATEWAY_URL=http://gateway:4444
-   GATEWAY_TOKEN=your-bearer-token
-   ```
-4. **Deploy** - Railway will automatically use the Dockerfile
+2. **Add PostgreSQL database** (Railway auto-configures `DATABASE_URL`)
+3. **Set environment variables** in Railway dashboard (see Configuration section below)
+4. **Deploy from GitHub** - Connect your repository
+5. **Update `PROXY_BASE_URL`** with your actual Railway app URL after first deployment
+6. **Redeploy** - Railway will use the Dockerfile automatically
+
+## Configuration
+
+### Environment Variables
+
+Configure these in Railway dashboard or `.env` file for local development:
+
+#### Required Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | ✅ Yes | - | PostgreSQL connection string (auto-provided by Railway) |
+| `PORT` | ✅ Yes | `8080` | Application port (auto-provided by Railway) |
+| `PROXY_BASE_URL` | ✅ Yes | `http://localhost:8080` | **Must set to your Railway app URL** (e.g., `https://soap-proxy.up.railway.app`) |
+| `SECRET_KEY` | ✅ Yes (prod) | `dev-secret-key` | Flask session secret - generate random for production |
+
+#### Optional Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GATEWAY_URL` | ❌ Optional | Empty | MCP Gateway URL (can also configure via UI after login) |
+| `GATEWAY_TOKEN` | ❌ Optional | Empty | Gateway bearer token (can also configure via UI after login) |
+| `API_KEY` | ❌ Optional | Empty | If set, requires `X-API-Key` header for all API requests |
+| `ZEEP_CACHE_TIMEOUT` | ❌ Optional | `86400` | WSDL cache timeout in seconds (24 hours) |
+| `WSDL_REQUEST_TIMEOUT` | ❌ Optional | `30` | WSDL request timeout in seconds |
+
+### Example Railway Configuration
+
+**Minimal setup (required):**
+```bash
+# Railway auto-provides these:
+DATABASE_URL=postgresql://postgres:password@host:port/railway
+PORT=8080
+
+# You must set these:
+PROXY_BASE_URL=https://your-app-name.up.railway.app
+SECRET_KEY=generate-a-random-secret-key-here
+```
+
+**With Gateway integration (optional):**
+```bash
+# In addition to the above:
+GATEWAY_URL=http://gateway:4444
+GATEWAY_TOKEN=your-bearer-token-without-Bearer-prefix
+```
+
+### Generating SECRET_KEY
+
+Generate a secure random secret key:
+
+```bash
+# Python
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# OpenSSL
+openssl rand -base64 32
+```
+
+### Gateway Configuration via UI
+
+Instead of setting `GATEWAY_URL` and `GATEWAY_TOKEN` as environment variables, users can configure them through the web UI after logging in:
+
+1. Login to SOAP-Proxy
+2. Click "⚙️ Gateway Configuration"
+3. Enter Gateway URL and Bearer Token
+4. Click "💾 Save Configuration"
+
+This configuration is stored in the user session and persists during the browser session.
 
 ## Usage
 
