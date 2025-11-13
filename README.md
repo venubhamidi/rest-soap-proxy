@@ -1,3 +1,5 @@
+# rest-soap-proxy
+
 # SOAP-to-REST Proxy Service
 
 A standalone service that converts WSDL SOAP services into REST APIs with OpenAPI specifications. Designed to integrate with MCP Gateway for use with Claude Desktop.
@@ -317,4 +319,3 @@ For issues or questions:
 - Zeep (SOAP client)
 - PostgreSQL
 - Railway (deployment)
-# soap-rest-proxy
