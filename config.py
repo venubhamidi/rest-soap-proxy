@@ -12,7 +12,7 @@ class Config:
     # Database
     DATABASE_URL = os.getenv(
         'DATABASE_URL',
-        'postgresql://postgres:SOcEkxsIXEwwtyANuFcazdzvwSrKODqe@centerbeam.proxy.rlwy.net:18737/railway'
+        'postgresql://user:password@localhost:5432/database'
     )
 
     # Application

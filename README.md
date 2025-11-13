@@ -63,10 +63,10 @@ http://localhost:8080
 ### Railway Deployment
 
 1. **Create new Railway project**
-2. **Connect PostgreSQL database** (already configured)
+2. **Connect PostgreSQL database**
 3. **Set environment variables** in Railway dashboard:
    ```
-   DATABASE_URL=postgresql://postgres:SOcEkxsIXEwwtyANuFcazdzvwSrKODqe@centerbeam.proxy.rlwy.net:18737/railway
+   DATABASE_URL=postgresql://user:password@host:port/database
    PORT=8080
    PROXY_BASE_URL=https://your-app.railway.app
    GATEWAY_URL=http://gateway:4444

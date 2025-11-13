@@ -78,8 +78,8 @@ railway up
 In Railway dashboard, add these variables:
 
 ```bash
-# Database (already configured on Railway)
-DATABASE_URL=postgresql://postgres:SOcEkxsIXEwwtyANuFcazdzvwSrKODqe@centerbeam.proxy.rlwy.net:18737/railway
+# Database (configure with your Railway PostgreSQL)
+DATABASE_URL=postgresql://user:password@host:port/database
 
 # Application (Railway auto-provides PORT)
 PROXY_BASE_URL=https://your-app-name.up.railway.app
