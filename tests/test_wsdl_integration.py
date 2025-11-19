@@ -4,8 +4,13 @@ Comprehensive integration tests for WSDL to OpenAPI conversion and SOAP proxy
 import pytest
 import requests
 import json
+import sys
+import os
 from jsonschema import validate, ValidationError
 from deepdiff import DeepDiff
+
+# Add tests directory to path for conftest imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from conftest import (
     REST_URL, SOAP_URL, WSDL_URL, PROXY_URL,
