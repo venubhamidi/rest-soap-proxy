@@ -461,6 +461,14 @@ def execute_soap_operation(service_name, operation_name):
         # Get JSON parameters from request body
         parameters = request.json or {}
 
+        # Log incoming request for debugging
+        logger.info(f"=" * 60)
+        logger.info(f"INCOMING REST REQUEST TO SOAP PROXY")
+        logger.info(f"Service: {service_name}, Operation: {operation_name}")
+        logger.info(f"Raw JSON body: {request.data.decode('utf-8')}")
+        logger.info(f"Parsed parameters: {parameters}")
+        logger.info(f"=" * 60)
+
         # Execute SOAP operation
         result = soap_translator.execute_operation(
             service_name=service_name,

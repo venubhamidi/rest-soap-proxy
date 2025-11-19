@@ -132,16 +132,78 @@ class WSDLConverter:
         element_type = output_body.type
         return self.xsd_to_json_schema(element_type)
 
-    def xsd_to_json_schema(self, xsd_type) -> Dict:
+    def _resolve_type_name(self, xsd_type) -> str:
         """
-        Convert XSD type to JSON Schema
+        Extract local type name from XSD type, handling qualified names.
 
         Args:
             xsd_type: Zeep XSD type object
 
         Returns:
+            Local type name string
+        """
+        type_name = getattr(xsd_type, 'name', None)
+
+        if type_name is None:
+            return None
+
+        # Handle QName format: {namespace}localname
+        if isinstance(type_name, str) and type_name.startswith('{'):
+            # Extract local name from {http://...}localname
+            return type_name.split('}')[-1]
+
+        # Handle prefixed names: xs:string -> string
+        if isinstance(type_name, str) and ':' in type_name:
+            return type_name.split(':')[-1]
+
+        return type_name
+
+    def _is_wrapper_list_type(self, xsd_type) -> tuple:
+        """
+        Check if this is a wrapper type containing a single unbounded element.
+        These should be unwrapped to arrays.
+
+        Args:
+            xsd_type: Zeep XSD type object
+
+        Returns:
+            Tuple of (is_wrapper, inner_element) or (False, None)
+        """
+        if not hasattr(xsd_type, 'elements'):
+            return False, None
+
+        elements = list(xsd_type.elements)
+
+        # Check if single element with unbounded cardinality
+        if len(elements) == 1:
+            element_name, element_obj = elements[0]
+            max_occurs = getattr(element_obj, 'max_occurs', 1)
+
+            # unbounded is represented as None or 'unbounded' or a very large number
+            if max_occurs is None or max_occurs == 'unbounded' or (isinstance(max_occurs, int) and max_occurs > 1):
+                return True, element_obj
+
+        return False, None
+
+    def xsd_to_json_schema(self, xsd_type, visited=None) -> Dict:
+        """
+        Convert XSD type to JSON Schema with full support for:
+        - Wrapper type unwrapping (lists)
+        - Unbounded element arrays
+        - Proper required/optional field detection
+        - Qualified type name resolution
+        - Circular reference protection
+
+        Args:
+            xsd_type: Zeep XSD type object
+            visited: Set of visited type names for circular reference protection
+
+        Returns:
             JSON Schema dictionary
         """
+        if visited is None:
+            visited = set()
+
         # Type mapping
         XSD_TO_JSON_TYPE = {
             'string': 'string',
@@ -170,14 +232,31 @@ class WSDLConverter:
             'anyURI': 'string',
         }
 
-        type_name = getattr(xsd_type, 'name', None)
+        # Resolve type name (handles qualified names)
+        type_name = self._resolve_type_name(xsd_type)
 
-        # Simple type
-        if type_name in XSD_TO_JSON_TYPE:
+        # Simple type check
+        if type_name and type_name in XSD_TO_JSON_TYPE:
             schema = {"type": XSD_TO_JSON_TYPE[type_name]}
             if type_name in ['date', 'dateTime', 'time']:
                 schema['format'] = type_name
             return schema
+
+        # Circular reference protection
+        type_id = id(xsd_type)
+        if type_id in visited:
+            logger.warning(f"Circular reference detected for type: {type_name}")
+            return {"type": "object", "description": f"Circular reference to {type_name}"}
+        visited = visited | {type_id}
+
+        # Check for wrapper list types (e.g., RecentClaimList, RiskFactorList, StringList)
+        is_wrapper, inner_element = self._is_wrapper_list_type(xsd_type)
+        if is_wrapper:
+            inner_type = inner_element.type
+            return {
+                "type": "array",
+                "items": self.xsd_to_json_schema(inner_type, visited)
+            }
 
         # Complex type with elements
         if hasattr(xsd_type, 'elements'):
@@ -192,15 +271,34 @@ class WSDLConverter:
                 element_obj = element[1]
                 element_type_obj = element_obj.type
 
-                # Recursively convert element type
-                schema['properties'][element_name] = self.xsd_to_json_schema(element_type_obj)
+                # Check cardinality for arrays
+                max_occurs = getattr(element_obj, 'max_occurs', 1)
+                min_occurs = getattr(element_obj, 'min_occurs', 1)
+
+                # Determine if this element is an array
+                is_array = max_occurs is None or max_occurs == 'unbounded' or (isinstance(max_occurs, int) and max_occurs > 1)
+
+                if is_array:
+                    # Element is an array
+                    schema['properties'][element_name] = {
+                        "type": "array",
+                        "items": self.xsd_to_json_schema(element_type_obj, visited)
+                    }
+                else:
+                    # Single element - recursively convert
+                    schema['properties'][element_name] = self.xsd_to_json_schema(element_type_obj, visited)
 
                 # Add description if available
                 if hasattr(element_obj, 'documentation') and element_obj.documentation:
                     schema['properties'][element_name]['description'] = element_obj.documentation
 
-                # Check if required
-                if not element_obj.is_optional:
+                # Check if required using min_occurs
+                # min_occurs > 0 means required, 0 means optional
+                is_optional = getattr(element_obj, 'is_optional', False)
+                if min_occurs is None:
+                    min_occurs = 0 if is_optional else 1
+
+                if min_occurs > 0:
                     schema['required'].append(element_name)
 
             if not schema['required']:
@@ -208,11 +306,11 @@ class WSDLConverter:
 
             return schema
 
-        # Array type
+        # Array type (explicit item_type)
         if hasattr(xsd_type, 'item_type'):
             return {
                 "type": "array",
-                "items": self.xsd_to_json_schema(xsd_type.item_type)
+                "items": self.xsd_to_json_schema(xsd_type.item_type, visited)
             }
 
         # Fallback for unknown types

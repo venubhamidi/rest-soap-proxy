@@ -82,9 +82,23 @@ class SOAPTranslator:
 
         # Execute SOAP call
         try:
+            logger.info(f"=" * 60)
+            logger.info(f"SOAP REQUEST CONSTRUCTION")
+            logger.info(f"Operation: {operation_name}")
+            logger.info(f"Parameters being sent to SOAP: {parameters}")
+            logger.info(f"Parameter keys: {list(parameters.keys()) if isinstance(parameters, dict) else 'N/A'}")
+
+            # Log each parameter for debugging
+            if isinstance(parameters, dict):
+                for key, value in parameters.items():
+                    logger.info(f"  {key}: {value} (type: {type(value).__name__})")
+
+            logger.info(f"=" * 60)
+
             logger.debug(f"Calling SOAP operation: {operation_name}")
             result = operation(**parameters)
-            logger.debug(f"SOAP call successful")
+            logger.info(f"SOAP call successful")
+            logger.info(f"Raw result type: {type(result)}")
 
             # Convert Zeep result to JSON-serializable format
             json_result = self._serialize_zeep_result(result)
