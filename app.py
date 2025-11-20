@@ -294,7 +294,7 @@ def get_service(service_id):
 @require_auth
 @app.route('/api/services/<service_id>', methods=['DELETE'])
 def delete_service(service_id):
-    """Delete service and unregister from Gateway if needed"""
+    """Delete service with full cleanup: unregister from Gateway, clear caches, delete DB entries"""
     db = SessionLocal()
     try:
         service = db.query(Service).filter(Service.id == service_id).first()
@@ -302,7 +302,10 @@ def delete_service(service_id):
         if not service:
             return jsonify({'error': 'Service not found'}), 404
 
-        # Unregister from Gateway if registered
+        service_name = service.name
+        wsdl_url = service.wsdl_url
+
+        # 1. Unregister from Gateway if registered
         if service.gateway_registered and is_gateway_configured():
             try:
                 gateway_client = GatewayClient(
@@ -310,17 +313,45 @@ def delete_service(service_id):
                     bearer_token=get_gateway_token()
                 )
                 gateway_client.unregister_service(service, db)
-                logger.info(f"Service unregistered from Gateway: {service.name}")
+                logger.info(f"Service unregistered from Gateway: {service_name}")
             except Exception as e:
                 logger.error(f"Error unregistering from Gateway: {e}")
 
-        # Delete service (cascade deletes operations)
+        # 2. Clear Zeep client cache for this WSDL
+        if wsdl_url and wsdl_url in soap_translator.zeep_clients:
+            del soap_translator.zeep_clients[wsdl_url]
+            logger.info(f"Cleared Zeep client cache for: {wsdl_url}")
+
+        # 3. Clear WSDL cache entry from database
+        try:
+            wsdl_cache = db.query(WSDLCache).filter(WSDLCache.wsdl_url == wsdl_url).first()
+            if wsdl_cache:
+                db.delete(wsdl_cache)
+                logger.info(f"Deleted WSDL cache entry for: {wsdl_url}")
+        except Exception as e:
+            logger.error(f"Error deleting WSDL cache: {e}")
+
+        # 4. Delete service (cascade deletes operations)
         db.delete(service)
         db.commit()
 
-        logger.info(f"Service deleted: {service.name}")
+        # 5. Clear SQLite Zeep cache (optional - clears entire cache)
+        try:
+            if hasattr(soap_translator.cache, '_db'):
+                import os
+                cache_path = soap_translator.cache._db
+                if os.path.exists(cache_path):
+                    os.remove(cache_path)
+                    logger.info(f"Cleared SQLite Zeep cache: {cache_path}")
+        except Exception as e:
+            logger.error(f"Error clearing SQLite cache: {e}")
 
-        return jsonify({'success': True})
+        logger.info(f"Service fully deleted with all caches cleared: {service_name}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Service {service_name} deleted. Gateway unregistered, all caches cleared.'
+        })
 
     except Exception as e:
         db.rollback()
