@@ -493,6 +493,32 @@ def execute_soap_operation(service_name, operation_name):
 
 
 @require_auth
+@app.route('/admin/clear-cache', methods=['POST'])
+def clear_cache():
+    """Clear all WSDL caches (in-memory and SQLite)"""
+    try:
+        # Clear in-memory Zeep client cache
+        soap_translator.clear_client_cache()
+
+        # Clear SQLite cache
+        if hasattr(soap_translator.cache, '_db'):
+            import os
+            cache_path = soap_translator.cache._db
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+                logger.info(f"Removed SQLite cache: {cache_path}")
+
+        logger.info("All WSDL caches cleared successfully")
+        return jsonify({
+            'success': True,
+            'message': 'All caches cleared. WSDL will be reloaded on next request.'
+        })
+    except Exception as e:
+        logger.error(f"Error clearing cache: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@require_auth
 @app.route('/api/gateway/config', methods=['GET'])
 def get_gateway_config():
     """Get gateway configuration (from env or session)"""
