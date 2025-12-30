@@ -80,6 +80,10 @@ class SOAPTranslator:
         except AttributeError:
             raise ValueError(f"Operation '{operation_name}' not found in service '{service_name}'")
 
+        # Transform parameters to match WSDL wrapper structure
+        if isinstance(parameters, dict):
+            parameters = self._rewrap_list_parameters(parameters, zeep_client, operation_name)
+
         # Execute SOAP call
         try:
             logger.info(f"=" * 60)
@@ -114,6 +118,66 @@ class SOAPTranslator:
         except Exception as e:
             logger.error(f"Error executing SOAP operation: {e}")
             raise
+
+    def _rewrap_list_parameters(self, parameters: Dict[str, Any], zeep_client: Client, operation_name: str) -> Dict[str, Any]:
+        """
+        Rewrap list parameters to match WSDL wrapper structure.
+
+        JSON Schema exposes arrays directly for usability:
+            {"recentClaims": [{...}, {...}]}
+
+        But Zeep/WSDL expects wrapper structure:
+            {"recentClaims": {"recentClaim": [{...}, {...}]}}
+
+        This method detects and rewraps such parameters.
+        """
+        try:
+            # Get operation input type from Zeep
+            binding_name = list(zeep_client.wsdl.bindings.keys())[0]
+            binding = zeep_client.wsdl.bindings[binding_name]
+            binding_operation = binding.get(operation_name)
+
+            if not binding_operation or not binding_operation.input.body:
+                return parameters
+
+            input_type = binding_operation.input.body.type
+            if not hasattr(input_type, 'elements'):
+                return parameters
+
+            transformed = dict(parameters)
+
+            for element_tuple in input_type.elements:
+                element_name = element_tuple[0]
+                element = element_tuple[1]
+
+                if element_name not in transformed:
+                    continue
+
+                value = transformed[element_name]
+
+                # Only process if value is a list and element has a wrapper type
+                if not isinstance(value, list):
+                    continue
+
+                if not hasattr(element, 'type') or not hasattr(element.type, 'elements'):
+                    continue
+
+                # Check if this is a wrapper type (single unbounded child element)
+                inner_elements = list(element.type.elements)
+                if len(inner_elements) == 1:
+                    inner_name, inner_element = inner_elements[0]
+                    max_occurs = getattr(inner_element, 'max_occurs', 1)
+
+                    # Check if unbounded
+                    if max_occurs is None or max_occurs == 'unbounded' or (isinstance(max_occurs, int) and max_occurs > 1):
+                        logger.info(f"Rewrapping list parameter '{element_name}' into '{inner_name}'")
+                        transformed[element_name] = {inner_name: value}
+
+            return transformed
+
+        except Exception as e:
+            logger.warning(f"Could not rewrap parameters (using as-is): {e}")
+            return parameters
 
     def _get_service(self, service_name: str) -> Optional[Service]:
         """Get service from database"""
