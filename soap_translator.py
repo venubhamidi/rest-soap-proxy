@@ -6,6 +6,7 @@ from zeep import Client
 from zeep.cache import SqliteCache
 from zeep.transports import Transport
 from zeep.wsse.username import UsernameToken
+from zeep.wsse import utils as wsse_utils
 from zeep.exceptions import Fault as SOAPFault
 from requests import Session
 from requests.auth import HTTPBasicAuth
@@ -16,6 +17,27 @@ from database import Service, WSDLCache, SessionLocal
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+class TimestampedUsernameToken(UsernameToken):
+    """UsernameToken that generates a fresh WSU:Timestamp for each request."""
+
+    def __init__(self, *args, add_timestamp=False, timestamp_ttl=300, **kwargs):
+        # Pass timestamp_token=None to parent — we handle it ourselves
+        super().__init__(*args, timestamp_token=None, **kwargs)
+        self._add_timestamp = add_timestamp
+        self._timestamp_ttl = timestamp_ttl
+
+    def apply(self, envelope, headers):
+        if self._add_timestamp:
+            import datetime
+            now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+            expires = now + datetime.timedelta(seconds=self._timestamp_ttl)
+            ts = wsse_utils.WSU.Timestamp()
+            ts.append(wsse_utils.WSU.Created(now.isoformat()))
+            ts.append(wsse_utils.WSU.Expires(expires.isoformat()))
+            self.timestamp_token = ts
+        return super().apply(envelope, headers)
 
 
 class SOAPTranslator:
@@ -289,11 +311,11 @@ class SOAPTranslator:
             use_digest = wsse_conf.get('use_digest', False)
             add_timestamp = wsse_conf.get('add_timestamp', False)
 
-            wsse_plugin = UsernameToken(
+            wsse_plugin = TimestampedUsernameToken(
                 username=username,
                 password=password,
                 use_digest=use_digest,
-                timestamp_token=add_timestamp
+                add_timestamp=add_timestamp
             )
             logger.info(f"WS-Security UsernameToken configured (digest={use_digest}, timestamp={add_timestamp})")
 

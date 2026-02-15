@@ -358,7 +358,16 @@ class WSDLConverter:
 
             # Handle XSD attributes (e.g., <xs:attribute name="id" type="xs:string"/>)
             if hasattr(xsd_type, 'attributes'):
-                for attr_name, attr_obj in xsd_type.attributes.items():
+                attrs = xsd_type.attributes
+                # Normalize: can be dict-like (.items()) or list of tuples
+                if hasattr(attrs, 'items'):
+                    attr_iter = attrs.items()
+                elif isinstance(attrs, (list, tuple)):
+                    attr_iter = attrs
+                else:
+                    attr_iter = []
+
+                for attr_name, attr_obj in attr_iter:
                     attr_type = getattr(attr_obj, 'type', None)
                     attr_schema = self.xsd_to_json_schema(attr_type, visited) if attr_type else {"type": "string"}
                     attr_schema['x-xsd-attribute'] = True
