@@ -138,11 +138,36 @@ class WSDLCache(Base):
         }
 
 
+def _run_migrations():
+    """Run schema migrations for columns that create_all won't add to existing tables"""
+    from sqlalchemy import text, inspect
+
+    inspector = inspect(engine)
+
+    # Check if 'services' table exists before attempting migration
+    if 'services' not in inspector.get_table_names():
+        return  # Table will be created by create_all with all columns
+
+    existing_columns = {col['name'] for col in inspector.get_columns('services')}
+
+    migrations = []
+    if 'security_config' not in existing_columns:
+        migrations.append("ALTER TABLE services ADD COLUMN security_config JSONB")
+
+    if migrations:
+        with engine.begin() as conn:
+            for sql in migrations:
+                logger.info(f"Running migration: {sql}")
+                conn.execute(text(sql))
+        logger.info(f"Completed {len(migrations)} migration(s)")
+
+
 def init_db():
-    """Initialize database - create all tables if they don't exist"""
+    """Initialize database - create all tables and run migrations"""
     try:
         logger.info("Initializing database tables...")
         Base.metadata.create_all(bind=engine, checkfirst=True)
+        _run_migrations()
         logger.info("Database tables initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database tables: {e}")
