@@ -258,6 +258,52 @@ class WSDLConverter:
                 "items": self.xsd_to_json_schema(inner_type, visited)
             }
 
+        # Handle XSD choice types → JSON Schema oneOf
+        type_class_name = type(xsd_type).__name__
+        if 'Choice' in type_class_name or (hasattr(xsd_type, 'is_choice') and xsd_type.is_choice):
+            if hasattr(xsd_type, 'elements'):
+                options = []
+                for element in xsd_type.elements:
+                    element_name = element[0]
+                    element_obj = element[1]
+                    option_schema = {
+                        "type": "object",
+                        "properties": {
+                            element_name: self.xsd_to_json_schema(element_obj.type, visited)
+                        },
+                        "required": [element_name]
+                    }
+                    options.append(option_schema)
+                if options:
+                    return {"oneOf": options}
+
+        # Handle enumeration restrictions (e.g., xs:restriction with xs:enumeration)
+        if hasattr(xsd_type, 'facets') and xsd_type.facets:
+            enum_values = []
+            for facet_name, facet in xsd_type.facets.items():
+                if facet_name == 'enumeration':
+                    if hasattr(facet, 'values'):
+                        enum_values = list(facet.values)
+                    elif isinstance(facet, (list, tuple)):
+                        enum_values = list(facet)
+            if enum_values:
+                return {"type": "string", "enum": enum_values}
+
+        # Handle extension types (type that extends a base type)
+        if hasattr(xsd_type, 'extension') and xsd_type.extension:
+            base_schema = self.xsd_to_json_schema(xsd_type.extension, visited)
+            # Merge base properties with this type's elements
+            if hasattr(xsd_type, 'elements'):
+                if base_schema.get('type') == 'object' and 'properties' in base_schema:
+                    for element in xsd_type.elements:
+                        element_name = element[0]
+                        element_obj = element[1]
+                        base_schema['properties'][element_name] = self.xsd_to_json_schema(element_obj.type, visited)
+                        min_occurs = getattr(element_obj, 'min_occurs', 1)
+                        if min_occurs and min_occurs > 0:
+                            base_schema.setdefault('required', []).append(element_name)
+            return base_schema
+
         # Complex type with elements
         if hasattr(xsd_type, 'elements'):
             schema = {
@@ -275,6 +321,9 @@ class WSDLConverter:
                 max_occurs = getattr(element_obj, 'max_occurs', 1)
                 min_occurs = getattr(element_obj, 'min_occurs', 1)
 
+                # Check if element is nillable (allow null)
+                is_nillable = getattr(element_obj, 'nillable', False)
+
                 # Determine if this element is an array
                 is_array = max_occurs is None or max_occurs == 'unbounded' or (isinstance(max_occurs, int) and max_occurs > 1)
 
@@ -286,7 +335,13 @@ class WSDLConverter:
                     }
                 else:
                     # Single element - recursively convert
-                    schema['properties'][element_name] = self.xsd_to_json_schema(element_type_obj, visited)
+                    prop_schema = self.xsd_to_json_schema(element_type_obj, visited)
+
+                    # Handle nillable: allow null values
+                    if is_nillable and prop_schema.get('type') and prop_schema['type'] != 'object':
+                        prop_schema['type'] = [prop_schema['type'], 'null']
+
+                    schema['properties'][element_name] = prop_schema
 
                 # Add description if available
                 if hasattr(element_obj, 'documentation') and element_obj.documentation:
@@ -300,6 +355,17 @@ class WSDLConverter:
 
                 if min_occurs > 0:
                     schema['required'].append(element_name)
+
+            # Handle XSD attributes (e.g., <xs:attribute name="id" type="xs:string"/>)
+            if hasattr(xsd_type, 'attributes'):
+                for attr_name, attr_obj in xsd_type.attributes.items():
+                    attr_type = getattr(attr_obj, 'type', None)
+                    attr_schema = self.xsd_to_json_schema(attr_type, visited) if attr_type else {"type": "string"}
+                    attr_schema['x-xsd-attribute'] = True
+                    schema['properties'][attr_name] = attr_schema
+
+                    if getattr(attr_obj, 'use', None) == 'required':
+                        schema['required'].append(attr_name)
 
             if not schema['required']:
                 del schema['required']

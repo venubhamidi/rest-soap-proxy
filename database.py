@@ -39,6 +39,9 @@ class Service(Base):
     description = Column(Text)
     openapi_spec = Column(JSONB, nullable=False)
 
+    # Security configuration (WSSE, Basic Auth, Client Cert)
+    security_config = Column(JSONB, nullable=True)
+
     # Gateway registration tracking
     gateway_registered = Column(Boolean, default=False, index=True)
     gateway_server_uuid = Column(PGUUID(as_uuid=True), nullable=True)
@@ -53,13 +56,14 @@ class Service(Base):
     operations = relationship("Operation", back_populates="service", cascade="all, delete-orphan")
 
     def to_dict(self):
-        """Convert to dictionary"""
+        """Convert to dictionary (masks sensitive security fields)"""
         return {
             'id': str(self.id),
             'name': self.name,
             'wsdl_url': self.wsdl_url,
             'description': self.description,
             'openapi_spec': self.openapi_spec,
+            'security_config': self._mask_security_config(),
             'gateway_registered': self.gateway_registered,
             'gateway_server_uuid': str(self.gateway_server_uuid) if self.gateway_server_uuid else None,
             'gateway_mcp_endpoint': self.gateway_mcp_endpoint,
@@ -68,6 +72,23 @@ class Service(Base):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'operations_count': len(self.operations)
         }
+
+    def _mask_security_config(self):
+        """Return security config with passwords and keys masked"""
+        if not self.security_config:
+            return None
+
+        import copy
+        config = copy.deepcopy(self.security_config)
+        sensitive_keys = {'password', 'key_path', 'cert_path', 'ca_bundle_path'}
+
+        for section in ('wsse', 'basic_auth', 'client_cert'):
+            if section in config and isinstance(config[section], dict):
+                for key in sensitive_keys:
+                    if key in config[section] and config[section][key]:
+                        config[section][key] = '****'
+
+        return config
 
 
 class Operation(Base):

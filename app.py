@@ -13,7 +13,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 
 from config import Config
-from database import init_db, SessionLocal, Service, Operation
+from database import init_db, SessionLocal, Service, Operation, WSDLCache
 from wsdl_converter import WSDLConverter
 from gateway_client import GatewayClient
 from soap_translator import get_soap_translator
@@ -474,6 +474,66 @@ def unregister_from_gateway(service_id):
         logger.error(f"Error unregistering from Gateway: {e}")
         return jsonify({'error': str(e)}), 500
 
+    finally:
+        db.close()
+
+
+@require_auth
+@app.route('/api/services/<service_id>/security', methods=['GET'])
+def get_security_config(service_id):
+    """Get security config for a service (passwords masked)"""
+    db = SessionLocal()
+    try:
+        service = db.query(Service).filter(Service.id == service_id).first()
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+
+        return jsonify({
+            'service_id': str(service.id),
+            'service_name': service.name,
+            'security_config': service._mask_security_config()
+        })
+    finally:
+        db.close()
+
+
+@require_auth
+@app.route('/api/services/<service_id>/security', methods=['POST'])
+def save_security_config(service_id):
+    """Save security config for a service"""
+    db = SessionLocal()
+    try:
+        service = db.query(Service).filter(Service.id == service_id).first()
+        if not service:
+            return jsonify({'error': 'Service not found'}), 404
+
+        data = request.json
+        if not data:
+            return jsonify({'error': 'Request body required'}), 400
+
+        auth_type = data.get('auth_type', 'none')
+        valid_types = ('none', 'wsse_username', 'basic_auth', 'client_cert')
+        if auth_type not in valid_types:
+            return jsonify({'error': f'Invalid auth_type. Must be one of: {valid_types}'}), 400
+
+        service.security_config = data
+        db.commit()
+
+        # Clear cached Zeep client so next call picks up new security config
+        soap_translator.clear_client_cache()
+
+        logger.info(f"Security config saved for service {service.name} (auth_type={auth_type})")
+
+        return jsonify({
+            'success': True,
+            'message': f'Security config saved for {service.name}',
+            'auth_type': auth_type
+        })
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error saving security config: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         db.close()
 

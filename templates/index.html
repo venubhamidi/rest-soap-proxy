@@ -81,6 +81,74 @@
                     <input type="text" id="service-name" name="service_name" placeholder="Auto-detected from WSDL">
                 </div>
 
+                <!-- Security Configuration -->
+                <details class="security-details">
+                    <summary>🔒 Security Settings (optional)</summary>
+                    <div class="security-config-form">
+                        <div class="form-group">
+                            <label>Authentication Type:</label>
+                            <select id="auth-type" name="auth_type" onchange="toggleSecurityFields()">
+                                <option value="none">None</option>
+                                <option value="wsse_username">WS-Security UsernameToken</option>
+                                <option value="basic_auth">HTTP Basic Auth</option>
+                                <option value="client_cert">Client Certificate (mTLS)</option>
+                            </select>
+                        </div>
+
+                        <!-- WS-Security fields -->
+                        <div id="wsse-fields" style="display:none;">
+                            <div class="form-group">
+                                <label>WSSE Username:</label>
+                                <input type="text" id="wsse-username" placeholder="SOAP service username">
+                            </div>
+                            <div class="form-group">
+                                <label>WSSE Password:</label>
+                                <input type="password" id="wsse-password" placeholder="SOAP service password">
+                            </div>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="wsse-digest">
+                                    <span class="label-text">Use Password Digest</span>
+                                </label>
+                            </div>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="wsse-timestamp" checked>
+                                    <span class="label-text">Add Timestamp Token</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Basic Auth fields -->
+                        <div id="basic-auth-fields" style="display:none;">
+                            <div class="form-group">
+                                <label>Username:</label>
+                                <input type="text" id="ba-username" placeholder="HTTP Basic Auth username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password:</label>
+                                <input type="password" id="ba-password" placeholder="HTTP Basic Auth password">
+                            </div>
+                        </div>
+
+                        <!-- Client Cert fields -->
+                        <div id="client-cert-fields" style="display:none;">
+                            <div class="form-group">
+                                <label>Client Certificate Path:</label>
+                                <input type="text" id="cert-path" placeholder="/path/to/client.pem">
+                            </div>
+                            <div class="form-group">
+                                <label>Private Key Path:</label>
+                                <input type="text" id="key-path" placeholder="/path/to/key.pem">
+                            </div>
+                            <div class="form-group">
+                                <label>CA Bundle Path (optional):</label>
+                                <input type="text" id="ca-path" placeholder="/path/to/ca-bundle.pem">
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
                 <!-- Auto-register checkbox -->
                 {% if gateway_configured %}
                 <div class="checkbox-group">

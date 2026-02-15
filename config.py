@@ -34,6 +34,9 @@ class Config:
     ZEEP_CACHE_TIMEOUT = int(os.getenv('ZEEP_CACHE_TIMEOUT', 86400))  # 24 hours
     WSDL_REQUEST_TIMEOUT = int(os.getenv('WSDL_REQUEST_TIMEOUT', 30))  # 30 seconds
 
+    # Client certificate storage path
+    CERT_STORAGE_PATH = os.getenv('CERT_STORAGE_PATH', '/tmp/certs')
+
     @classmethod
     def gateway_configured(cls):
         """Check if Gateway integration is configured"""

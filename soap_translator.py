@@ -1,12 +1,15 @@
 """
 SOAP Translator
-Handles runtime REST to SOAP translation
+Handles runtime REST to SOAP translation with security support
 """
 from zeep import Client
 from zeep.cache import SqliteCache
 from zeep.transports import Transport
+from zeep.wsse.username import UsernameToken
 from zeep.exceptions import Fault as SOAPFault
-from typing import Dict, Any, Optional
+from requests import Session
+from requests.auth import HTTPBasicAuth
+from typing import Dict, Any, Optional, Tuple
 import logging
 
 from database import Service, WSDLCache, SessionLocal
@@ -67,11 +70,12 @@ class SOAPTranslator:
         parameters = self._normalize_parameters(parameters, operation_metadata)
         logger.debug(f"Normalized parameters: {parameters}")
 
-        # Get WSDL URL
+        # Get WSDL URL and security config
         wsdl_url = service.wsdl_url
+        security_config = service.security_config
 
-        # Get or create Zeep client
-        zeep_client = self._get_zeep_client(wsdl_url, service_name)
+        # Get or create Zeep client (with security applied)
+        zeep_client = self._get_zeep_client(wsdl_url, service_name, security_config)
 
         # Get operation
         try:
@@ -242,27 +246,118 @@ class SOAPTranslator:
         # No parameters expected
         return {}
 
-    def _get_zeep_client(self, wsdl_url: str, service_name: str) -> Client:
+    def _get_cache_key(self, wsdl_url: str, security_config: Optional[Dict]) -> str:
+        """Build cache key that includes auth type so different configs get different clients"""
+        auth_type = 'none'
+        if security_config:
+            auth_type = security_config.get('auth_type', 'none')
+        return f"{wsdl_url}::{auth_type}"
+
+    def _build_transport_and_wsse(
+        self, security_config: Optional[Dict]
+    ) -> Tuple[Transport, Optional[UsernameToken]]:
         """
-        Get or create Zeep client (with in-memory caching)
+        Build a Zeep Transport and optional WSSE plugin based on security config.
+
+        Supports:
+        - none: Default transport (no auth)
+        - wsse_username: WS-Security UsernameToken header in SOAP envelope
+        - basic_auth: HTTP Basic Auth on the transport session
+        - client_cert: mTLS client certificate on the transport session
+
+        Returns:
+            Tuple of (Transport, wsse_plugin_or_None)
+        """
+        auth_type = (security_config or {}).get('auth_type', 'none')
+        wsse_plugin = None
+
+        if auth_type == 'none' or not security_config:
+            return self.transport, None
+
+        # Build a dedicated requests.Session for this security context
+        session = Session()
+
+        # Apply custom headers if provided
+        custom_headers = security_config.get('custom_headers')
+        if custom_headers and isinstance(custom_headers, dict):
+            session.headers.update(custom_headers)
+
+        if auth_type == 'wsse_username':
+            wsse_conf = security_config.get('wsse', {})
+            username = wsse_conf.get('username', '')
+            password = wsse_conf.get('password', '')
+            use_digest = wsse_conf.get('use_digest', False)
+            add_timestamp = wsse_conf.get('add_timestamp', False)
+
+            wsse_plugin = UsernameToken(
+                username=username,
+                password=password,
+                use_digest=use_digest,
+                timestamp_token=add_timestamp
+            )
+            logger.info(f"WS-Security UsernameToken configured (digest={use_digest}, timestamp={add_timestamp})")
+
+        elif auth_type == 'basic_auth':
+            ba_conf = security_config.get('basic_auth', {})
+            session.auth = HTTPBasicAuth(
+                ba_conf.get('username', ''),
+                ba_conf.get('password', '')
+            )
+            logger.info("HTTP Basic Auth configured on transport")
+
+        elif auth_type == 'client_cert':
+            cert_conf = security_config.get('client_cert', {})
+            cert_path = cert_conf.get('cert_path')
+            key_path = cert_conf.get('key_path')
+            ca_bundle = cert_conf.get('ca_bundle_path')
+
+            if cert_path and key_path:
+                session.cert = (cert_path, key_path)
+            elif cert_path:
+                session.cert = cert_path
+
+            if ca_bundle:
+                session.verify = ca_bundle
+
+            logger.info("Client certificate auth configured on transport")
+
+        transport = Transport(
+            session=session,
+            cache=self.cache,
+            timeout=Config.WSDL_REQUEST_TIMEOUT
+        )
+        return transport, wsse_plugin
+
+    def _get_zeep_client(self, wsdl_url: str, service_name: str, security_config: Optional[Dict] = None) -> Client:
+        """
+        Get or create Zeep client (with in-memory caching and security)
 
         Args:
             wsdl_url: WSDL URL
             service_name: Service name (for logging)
+            security_config: Optional security configuration dict
 
         Returns:
             Zeep Client instance
         """
-        if wsdl_url in self.zeep_clients:
+        cache_key = self._get_cache_key(wsdl_url, security_config)
+
+        if cache_key in self.zeep_clients:
             logger.debug(f"Using cached Zeep client for {service_name}")
-            return self.zeep_clients[wsdl_url]
+            return self.zeep_clients[cache_key]
 
         logger.info(f"Loading WSDL for {service_name}: {wsdl_url}")
 
         try:
-            client = Client(wsdl=wsdl_url, transport=self.transport)
-            self.zeep_clients[wsdl_url] = client
-            logger.info(f"WSDL loaded successfully for {service_name}")
+            transport, wsse_plugin = self._build_transport_and_wsse(security_config)
+
+            client = Client(
+                wsdl=wsdl_url,
+                transport=transport,
+                wsse=wsse_plugin
+            )
+            self.zeep_clients[cache_key] = client
+            logger.info(f"WSDL loaded successfully for {service_name} (auth={security_config.get('auth_type', 'none') if security_config else 'none'})")
             return client
 
         except Exception as e:
