@@ -99,6 +99,86 @@ services:
 | `basic` | `username`, `password` | HTTP Basic on the transport session |
 | `client_cert` | `cert_path`, `key_path`, `ca_bundle_path` | mTLS client certificate |
 
+## Adding a WSDL (walkthrough)
+
+There is **no admin UI and no per-WSDL URL** — you register a service by adding
+it to `services.yaml`, and every service is served from the one `/mcp` endpoint.
+
+The server reads its config from `$SERVICES_CONFIG` if set, otherwise
+`services.yaml` in the working directory (in Docker, `/app/services.yaml` — mount
+your own over it).
+
+**1. Add an entry** under `services:` (same indentation as the others):
+
+```yaml
+services:
+  - name: calculator
+    wsdl: http://www.dneonline.com/calculator.asmx?WSDL
+
+  - name: weather                       # <-- new service; unique, [a-z0-9_-]+
+    wsdl: https://example.com/weather?wsdl
+    auth:
+      type: basic
+      username: ${WEATHER_USER}         # secrets via env, never inline
+      password: ${WEATHER_PW}
+```
+
+Export any `${VAR}` you referenced (`export WEATHER_USER=… WEATHER_PW=…`) — a
+missing one fails the (re)load naming that variable.
+
+**2. Save.** With `hot_reload: true` the running server rebuilds within ~2s (no
+restart). Without it, restart the process. In Docker, a bind-mounted file that
+your editor replaces by inode may not trigger the poll — restart the container.
+
+**3. Confirm it loaded** (unauthenticated):
+
+```bash
+curl -s localhost:8080/health | jq
+# {"status":"ok","services":{"calculator":"loaded","weather":"loaded"}}
+```
+
+A bad WSDL shows `"weather":"failed: <reason>"` here; the other services keep
+working. Each operation becomes a tool named `weather_<Operation>`; nothing new
+to register — clients see it on their next `tools/list`.
+
+## Calling a tool from an MCP client
+
+Every tool lives at the single endpoint `POST /mcp` (streamable HTTP). A client
+does the normal MCP handshake, then `tools/list` / `tools/call`. Example with the
+official Python SDK:
+
+```python
+import anyio
+from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.session import ClientSession
+
+async def main():
+    headers = {"Authorization": "Bearer secret-token"}  # your PROXY_BEARER_TOKEN
+    async with streamablehttp_client("http://localhost:8080/mcp", headers=headers) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+
+            tools = await session.list_tools()
+            print([t.name for t in tools.tools])
+            # ['calculator_Add', 'calculator_Subtract', ..., 'weather_GetForecast']
+
+            result = await session.call_tool("calculator_Add", {"intA": 2, "intB": 3})
+            print(result.content[0].text)   # -> 5
+
+anyio.run(main)
+```
+
+- Arguments are a JSON object matching the tool's `inputSchema` (from the WSDL).
+  A single-parameter operation also accepts the bare value.
+- The result text is the SOAP response serialized to JSON; complex responses also
+  populate `structuredContent`.
+- A SOAP fault or transport error comes back as a normal result with
+  `isError: true` (see the error contract below), not a transport failure.
+
+For a gateway rather than a direct client, see
+[Federating with ContextForge](#federating-with-contextforge) below — it federates
+this same `/mcp` URL once and re-discovers tools automatically.
+
 ## Inbound auth
 
 - `POST /mcp` requires `Authorization: Bearer $PROXY_BEARER_TOKEN` (compared with
