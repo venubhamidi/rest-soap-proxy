@@ -1,14 +1,14 @@
-flask==3.0.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-zeep==4.2.1
-lxml==5.1.0
-pyyaml==6.0.1
-python-dotenv==1.0.0
-requests==2.31.0
-gunicorn==21.2.0
+# Runtime
+fastapi==0.139.0
+uvicorn[standard]==0.50.0
+mcp==1.28.1
+zeep==4.3.3
+pydantic==2.13.4
+pyyaml==6.0.3
+requests==2.34.2
+lxml==6.1.1
 
-# Test dependencies
-pytest==7.4.3
-jsonschema==4.20.0
-deepdiff==6.7.1
+# Test
+pytest==9.1.1
+jsonschema==4.26.0
+httpx==0.28.1

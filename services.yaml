@@ -1,0 +1,53 @@
+# Service registry for the SOAP → MCP proxy.
+#
+# Each service's WSDL is parsed at startup and every SOAP operation becomes an
+# MCP tool named "{service}_{operation}". Edit this file while the server runs
+# (hot_reload: true) to add/remove services without a restart.
+#
+# ${VAR} references are expanded from the environment at load time. A referenced
+# variable that is not set is a startup error naming the variable — secrets are
+# never silently blank.
+
+settings:
+  wsdl_request_timeout: 30   # seconds — Zeep transport / WSDL fetch
+  operation_timeout: 60      # seconds — per SOAP call
+  hot_reload: true           # watch this file (mtime poll) and rebuild on change
+
+services:
+  # Public demo service — no auth. Useful for a first smoke test.
+  - name: calculator
+    wsdl: http://www.dneonline.com/calculator.asmx?WSDL
+
+  # --- Examples of each upstream auth mode (commented out) ------------------
+
+  # WS-Security UsernameToken (digest + fresh timestamp per request):
+  # - name: weather
+  #   wsdl: ./wsdls/weather.wsdl
+  #   # wsdl_service: WeatherService   # pick when the WSDL has several
+  #   # wsdl_port: WeatherPort
+  #   auth:
+  #     type: wsse_username
+  #     username: svc-weather
+  #     password: ${WEATHER_SOAP_PASSWORD}
+  #     use_digest: false
+  #     add_timestamp: true
+  #     timestamp_ttl: 300
+  #   headers:
+  #     X-Route: internal
+
+  # HTTP Basic auth:
+  # - name: claims
+  #   wsdl: https://internal.example.com/claims?wsdl
+  #   auth:
+  #     type: basic
+  #     username: ${CLAIMS_USER}
+  #     password: ${CLAIMS_PASSWORD}
+
+  # mTLS client certificate:
+  # - name: legacy
+  #   wsdl: ./wsdls/legacy.wsdl
+  #   auth:
+  #     type: client_cert
+  #     cert_path: /etc/certs/client.pem
+  #     key_path: /etc/certs/client.key
+  #     ca_bundle_path: /etc/certs/ca.pem   # optional
